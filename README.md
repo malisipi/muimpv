@@ -9,7 +9,7 @@ Do you need a video player library for your V/MUI application? *You are correct 
 ## For Windows
 
 * Get MPV Shared library from [libmpv@sourceforge.net](https://sourceforge.net/projects/mpv-player-windows/files/libmpv/)
-* Copy `include` folder into project folder
+* Copy `include` folder and `libmpv-2.dll` into project folder
 * Copy `libmpv-2.dll` into parent directory of executables
 * And you're ready to go!
 
