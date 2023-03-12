@@ -24,7 +24,6 @@ bin/
 *.js
 
 # assets
-assets/*
 Observation
 
 # TODO: Windows testing
