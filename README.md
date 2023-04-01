@@ -1,7 +1,5 @@
 # MUIMPV - A Video Player Plugin for [MUI](https://github.com/malisipi/mui)
 
-> Use `remove-old-hacks` branch of MUI until merged.
-
 Do you need a video player library for your V/MUI application? *You are correct place!*
 
 !["Example"](./assets/video_player.png)
