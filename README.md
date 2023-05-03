@@ -17,5 +17,5 @@ Do you need a video player library for your V/MUI application? *You are correct 
 
 ## LICENSE
 
-* The library was licensed with GPLv3.
+* The library was dual-licensed with GPLv3 and LGPLv3.
 * Also this project shares codebase with [mpv-v](https://github.com/xjunko/mpv-v) project.
