@@ -3,6 +3,7 @@ module muimpv
 import malisipi.mui
 import gg
 import sync
+import sokol.gfx
 
 const (
 	c_win_width     = 640
@@ -124,7 +125,12 @@ pub fn (mut mpv MPVPlayer) update_texture() {
 			mpv.pixels[y][x] = mpv.pixels[y][x] | (255 << 24)
 		}
 	}
-	mpv.texture.update_pixel_data(&mpv.pixels)
+	
+	//mpv.texture.update_pixel_data(&mpv.pixels)
+	mut data := gfx.ImageData{}
+	data.subimage[0][0].ptr = &mpv.pixels
+	data.subimage[0][0].size = usize(mpv.texture.width * mpv.texture.height * mpv.texture.nr_channels)
+	gfx.update_image(mpv.texture.simg, &data)
 }
 
 pub fn get_video(mut app &mui.Window, id string) &MPVPlayer {
