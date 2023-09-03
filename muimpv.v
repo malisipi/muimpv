@@ -58,8 +58,10 @@ pub fn (mut mpv MPVPlayer) init(mut app &mui.Window) {
 	C.mpv_observe_property(mpv.handle, 0, 'duration'.str, C.MPV_FORMAT_DOUBLE)
 	C.mpv_observe_property(mpv.handle, 0, 'time-pos'.str, C.MPV_FORMAT_DOUBLE)
 
-	texture_id := app.gg.new_streaming_image(c_win_width, c_win_height, 4, pixel_format: .rgba8)
-	mpv.texture = app.gg.get_cached_image_by_idx(texture_id)
+	$if !offscreen_rendering? {
+		texture_id := app.gg.new_streaming_image(c_win_width, c_win_height, 4, pixel_format: .rgba8)
+		mpv.texture = app.gg.get_cached_image_by_idx(texture_id)
+	}
 }
 
 pub fn (mut mpv MPVPlayer) load_media(path string) {
@@ -105,32 +107,34 @@ pub fn (mut mpv MPVPlayer) on_mpv_events(mut app mui.Window) { // https://mpv.io
 
 [direct_array_access]
 pub fn (mut mpv MPVPlayer) update_texture() {
-	resolution := [c_win_width, c_win_height]
-	pitch := int(c_win_width*4)
-	rend_params := [
-		C.mpv_render_param{C.MPV_RENDER_PARAM_SW_SIZE, resolution.data},
-		C.mpv_render_param{C.MPV_RENDER_PARAM_SW_FORMAT, 'rgb0'.str},
-		C.mpv_render_param{C.MPV_RENDER_PARAM_SW_STRIDE, &pitch},
-		C.mpv_render_param{C.MPV_RENDER_PARAM_SW_POINTER, &mpv.pixels},
-		C.mpv_render_param{0, &voidptr(0)},
-	]
-	r := C.mpv_render_context_render(mpv.context, rend_params.data)
-	if r < 0 {
-		unsafe {
-			panic('MPVPlayer: Crash -> ${cstring_to_vstring(C.mpv_error_string(r))} | ${r}')
+	$if !offscreen_rendering? {
+		resolution := [c_win_width, c_win_height]
+		pitch := int(c_win_width*4)
+		rend_params := [
+			C.mpv_render_param{C.MPV_RENDER_PARAM_SW_SIZE, resolution.data},
+			C.mpv_render_param{C.MPV_RENDER_PARAM_SW_FORMAT, 'rgb0'.str},
+			C.mpv_render_param{C.MPV_RENDER_PARAM_SW_STRIDE, &pitch},
+			C.mpv_render_param{C.MPV_RENDER_PARAM_SW_POINTER, &mpv.pixels},
+			C.mpv_render_param{0, &voidptr(0)},
+		]
+		r := C.mpv_render_context_render(mpv.context, rend_params.data)
+		if r < 0 {
+			unsafe {
+				panic('MPVPlayer: Crash -> ${cstring_to_vstring(C.mpv_error_string(r))} | ${r}')
+			}
 		}
-	}
-	for y in 0 .. c_win_height { // 0XBB_GG_RR => 0xAA_BB_GG_RR
-		for x in 0 .. c_win_width {
-			mpv.pixels[y][x] = mpv.pixels[y][x] | (255 << 24)
+		for y in 0 .. c_win_height { // 0XBB_GG_RR => 0xAA_BB_GG_RR
+			for x in 0 .. c_win_width {
+				mpv.pixels[y][x] = mpv.pixels[y][x] | (255 << 24)
+			}
 		}
+		
+		//mpv.texture.update_pixel_data(&mpv.pixels)
+		mut data := gfx.ImageData{}
+		data.subimage[0][0].ptr = &mpv.pixels
+		data.subimage[0][0].size = usize(mpv.texture.width * mpv.texture.height * mpv.texture.nr_channels)
+		gfx.update_image(mpv.texture.simg, &data)
 	}
-	
-	//mpv.texture.update_pixel_data(&mpv.pixels)
-	mut data := gfx.ImageData{}
-	data.subimage[0][0].ptr = &mpv.pixels
-	data.subimage[0][0].size = usize(mpv.texture.width * mpv.texture.height * mpv.texture.nr_channels)
-	gfx.update_image(mpv.texture.simg, &data)
 }
 
 pub fn get_video(mut app &mui.Window, id string) &MPVPlayer {
@@ -174,10 +178,12 @@ pub fn new(mut app mui.Window, func mui.OnEvent, args mui.Widget) {
 
 [unsafe]
 fn draw_muimpv(app &mui.Window, object map[string]mui.WindowData){
-	unsafe {
-		mpv := &MPVPlayer(object["vdptr"].vpt)
-		mpv.update_texture()
-		app.gg.draw_image(object["x"].num, object["y"].num, object["w"].num, object["h"].num, mpv.texture)
+	$if !offscreen_rendering? {
+		unsafe {
+			mpv := &MPVPlayer(object["vdptr"].vpt)
+			mpv.update_texture()
+			app.gg.draw_image(object["x"].num, object["y"].num, object["w"].num, object["h"].num, mpv.texture)
+		}
 	}
 }
 
