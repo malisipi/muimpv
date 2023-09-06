@@ -27,7 +27,7 @@ pub mut:
 	video_paused   bool = true
 	video_path     string
 pub:
-	event_handler  mui.OnEvent
+	event_handler  mui.OnEvent = unsafe { nil }
 }
 
 pub fn (mut mpv MPVPlayer) init(mut app &mui.Window) {
@@ -87,18 +87,24 @@ pub fn (mut mpv MPVPlayer) on_mpv_events(mut app mui.Window) { // https://mpv.io
 				if prop.format == C.MPV_FORMAT_DOUBLE {
 					time_pos := unsafe { *(&f64(prop.data)) }
 					mpv.video_position = time_pos
-					mpv.event_handler(mui.EventDetails{event:"time_pos_update", value:"${int(time_pos)}"}, mut app, mut app.app_data)
+					if mpv.event_handler != unsafe { nil } {
+						mpv.event_handler(mui.EventDetails{event:"time_pos_update", value:"${int(time_pos)}"}, mut app, mut app.app_data)
+					}
 				} else {
 					if unsafe { voidptr(prop.data) } == unsafe { nil } {
 						mpv.video_paused = true
 					}
-					mpv.event_handler(mui.EventDetails{event:"duration_update", value:"0"}, mut app, mut app.app_data)
+					if mpv.event_handler != unsafe { nil } {
+						mpv.event_handler(mui.EventDetails{event:"duration_update", value:"0"}, mut app, mut app.app_data)
+					}
 				}
 			} else if unsafe { cstring_to_vstring(prop.name) } == 'duration' {
 				if prop.format == C.MPV_FORMAT_DOUBLE {
 					duration := unsafe { *(&f64(prop.data)) }
 					mpv.video_duration = duration
-					mpv.event_handler(mui.EventDetails{event:"duration_update", value:"${int(duration)}"}, mut app, mut app.app_data)
+					if mpv.event_handler != unsafe { nil } {
+						mpv.event_handler(mui.EventDetails{event:"duration_update", value:"${int(duration)}"}, mut app, mut app.app_data)
+					}
 				}
 			}
 			mpv.@lock.unlock()
