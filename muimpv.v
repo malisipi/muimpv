@@ -18,7 +18,7 @@ mut:
 	should_draw bool
 
 	pixels  [c_win_height][c_win_width]u32
-	texture &mfb.Image
+	texture &mfb.Image = &mfb.Image{}
 
 	@lock &sync.Mutex = sync.new_mutex()
 pub mut:
