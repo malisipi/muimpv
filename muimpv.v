@@ -25,6 +25,8 @@ mut:
 pub mut:
 	video_duration f64
 	video_position f64
+	new_video_duration_event bool = false
+	new_video_position_event bool = false
 	video_paused   bool = true
 	video_path     string
 pub:
@@ -33,6 +35,7 @@ pub:
 
 pub fn (mut mpv MPVPlayer) init(mut app &mui.Window) {
 	mpv.handle = C.mpv_create()
+	C.mpv_set_option_string(mpv.handle, 'vo'.str, 'libmpv'.str)
 	if C.mpv_initialize(mpv.handle) < 0 {
 		panic('MPVPlayer: Init failed!')
 	}
@@ -70,6 +73,7 @@ pub fn (mut mpv MPVPlayer) load_media(path string) {
 	C.mpv_command_async(mpv.handle, 0, [&char('loadfile'.str), &char(mpv.video_path.str), &char(0)].data)
 }
 
+[direct_array_access]
 pub fn (mut mpv MPVPlayer) on_mpv_events(mut app mui.Window) { // https://mpv.io/manual/master/#property-list
 	for {
 		event := C.mpv_wait_event(mpv.handle, 0)
@@ -86,24 +90,19 @@ pub fn (mut mpv MPVPlayer) on_mpv_events(mut app mui.Window) { // https://mpv.io
 				if prop.format == C.MPV_FORMAT_DOUBLE {
 					time_pos := unsafe { *(&f64(prop.data)) }
 					mpv.video_position = time_pos
-					if mpv.event_handler != unsafe { nil } {
-						mpv.event_handler(mui.EventDetails{event:"time_pos_update", value:"${int(time_pos)}"}, mut app, mut app.app_data)
-					}
+					mpv.new_video_position_event = true
 				} else {
 					if unsafe { voidptr(prop.data) } == unsafe { nil } {
 						mpv.video_paused = true
 					}
-					if mpv.event_handler != unsafe { nil } {
-						mpv.event_handler(mui.EventDetails{event:"duration_update", value:"0"}, mut app, mut app.app_data)
-					}
+					mpv.video_position = 0;
+					mpv.new_video_position_event = true
 				}
 			} else if unsafe { cstring_to_vstring(prop.name) } == 'duration' {
 				if prop.format == C.MPV_FORMAT_DOUBLE {
 					duration := unsafe { *(&f64(prop.data)) }
 					mpv.video_duration = duration
-					if mpv.event_handler != unsafe { nil } {
-						mpv.event_handler(mui.EventDetails{event:"duration_update", value:"${int(duration)}"}, mut app, mut app.app_data)
-					}
+					mpv.new_video_duration_event = true
 				}
 			}
 			mpv.@lock.unlock()
@@ -184,9 +183,21 @@ pub fn new(mut app mui.Window, func mui.OnEvent, args mui.Widget) {
 
 [unsafe]
 fn draw_muimpv(app &mui.Window, object map[string]mui.WindowData){
-	$if !offscreen_rendering? {
-		unsafe {
-			mpv := &MPVPlayer(object["vdptr"].vpt)
+	unsafe {
+		mpv := &MPVPlayer(object["vdptr"].vpt)
+		if mpv.new_video_duration_event {
+			if mpv.event_handler != nil {
+				mpv.event_handler(mui.EventDetails{event:"duration_update", value:"${int(mpv.video_duration)}"}, mut app, mut app.app_data)
+			}
+			mpv.new_video_duration_event = false
+		}
+		if mpv.new_video_position_event {
+			if mpv.event_handler != nil {
+				mpv.event_handler(mui.EventDetails{event:"time_pos_update", value:"${int(mpv.video_position)}"}, mut app, mut app.app_data)
+			}
+			mpv.new_video_position_event = false
+		}
+		$if !offscreen_rendering? {
 			mpv.update_texture()
 			app.gg.draw_image(object["x"].num, object["y"].num, object["w"].num, object["h"].num, mpv.texture)
 		}
