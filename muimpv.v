@@ -1,9 +1,8 @@
 module muimpv
 
 import malisipi.mui
-import gg
+import malisipi.mfb
 import sync
-import sokol.gfx
 
 const (
 	c_win_width     = 640
@@ -19,7 +18,7 @@ mut:
 	should_draw bool
 
 	pixels  [c_win_height][c_win_width]u32
-	texture &gg.Image = unsafe { nil }
+	texture &mfb.Image = &mfb.Image{}
 
 	@lock &sync.Mutex = sync.new_mutex()
 pub mut:
@@ -62,8 +61,10 @@ pub fn (mut mpv MPVPlayer) init(mut app &mui.Window) {
 	C.mpv_observe_property(mpv.handle, 0, 'time-pos'.str, C.MPV_FORMAT_DOUBLE)
 
 	$if !offscreen_rendering? {
-		texture_id := app.gg.new_streaming_image(c_win_width, c_win_height, 4, pixel_format: .rgba8)
-		mpv.texture = app.gg.get_cached_image_by_idx(texture_id)
+		mpv.texture = &mfb.Image{
+			width: c_win_width,
+			height: c_win_height
+		}
 	}
 }
 
@@ -128,17 +129,17 @@ pub fn (mut mpv MPVPlayer) update_texture() {
 				panic('MPVPlayer: Crash -> ${cstring_to_vstring(C.mpv_error_string(r))} | ${r}')
 			}
 		}
+		mpv.texture.pixels = []mfb.Pixel{}
 		for y in 0 .. c_win_height { // 0XBB_GG_RR => 0xAA_BB_GG_RR
 			for x in 0 .. c_win_width {
-				mpv.pixels[y][x] = mpv.pixels[y][x] | (255 << 24)
+				mpv.texture.pixels << mfb.Pixel {
+					red: u8(mpv.pixels[y][x] >> 0 & 255)
+					green: u8(mpv.pixels[y][x] >> 8 & 255)
+					blue: u8(mpv.pixels[y][x] >> 16 & 255)
+					alpha: u8(255)
+				}
 			}
 		}
-		
-		//mpv.texture.update_pixel_data(&mpv.pixels)
-		mut data := gfx.ImageData{}
-		data.subimage[0][0].ptr = &mpv.pixels
-		data.subimage[0][0].size = usize(mpv.texture.width * mpv.texture.height * mpv.texture.nr_channels)
-		gfx.update_image(mpv.texture.simg, &data)
 	}
 }
 
